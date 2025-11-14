@@ -95,6 +95,10 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   rT1 = boost::posix_time::microsec_clock::local_time();
 
   // 2. Create vector of cloned *CAMERA* poses at each of our clone timesteps
+  /*
+  Dış döngü tamamlandığında, clones_cam veri yapısı, sistemdeki her kamera için,
+  özelliklerin üçgenleştirilmesi (triangulation) için hayati öneme sahiptir.
+  */
   std::unordered_map<size_t, std::unordered_map<double, FeatureInitializer::ClonePose>> clones_cam;
   for (const auto &clone_calib : state->_calib_IMUtoCAM) {
 
@@ -143,6 +147,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   rT2 = boost::posix_time::microsec_clock::local_time();
 
   // Calculate the max possible measurement size
+  // Oluşturulacak büyük Jakobiyan matrisi Hx_big ve rezidü vektörü res_big için maksimum satır sayısını belirlemek.
   size_t max_meas_size = 0;
   for (size_t i = 0; i < feature_vec.size(); i++) {
     for (const auto &pair : feature_vec.at(i)->timestamps) {
@@ -152,12 +157,16 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
 
   // Calculate max possible state size (i.e. the size of our covariance)
   // NOTE: that when we have the single inverse depth representations, those are only 1dof in size
+  // Amaç: Hx_big Jakobiyan matrisi için maksimum sütun sayısını belirlemek.
   size_t max_hx_size = state->max_covariance_size();
   for (auto &landmark : state->_features_SLAM) {
     max_hx_size -= landmark.second->size();
   }
 
   // Large Jacobian and residual of *all* features for this update
+  
+  // res_big: Tüm özelliklerin birleştirilmiş rezidü vektörü (rbig​).
+  // Hx_big: Tüm özelliklerin birleştirilmiş Jakobiyan matrisi (Hbig​).
   Eigen::VectorXd res_big = Eigen::VectorXd::Zero(max_meas_size);
   Eigen::MatrixXd Hx_big = Eigen::MatrixXd::Zero(max_meas_size, max_hx_size);
   std::unordered_map<std::shared_ptr<Type>, size_t> Hx_mapping;
